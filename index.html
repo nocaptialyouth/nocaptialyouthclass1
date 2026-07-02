@@ -1,0 +1,97 @@
+const $ = id => document.getElementById(id);
+const githubId = $("githubId");
+const domainName = $("domainName");
+const toast = $("toast");
+
+function cleanGithub(value) {
+  return value.trim().replace(/^@/, "").replace(/[^a-zA-Z0-9-]/g, "");
+}
+function cleanDomain(value) {
+  return value.trim().toLowerCase()
+    .replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "")
+    .replace(/[^a-z0-9.-]/g, "");
+}
+function updatePlan() {
+  const user = cleanGithub(githubId.value) || "내아이디";
+  const domain = cleanDomain(domainName.value) || "내도메인.com";
+  const repo = `${user}.github.io`;
+  const free = `https://${repo}`;
+  const root = `https://${domain}`;
+  const custom = `https://www.${domain}`;
+  $("freeUrl").textContent = free;
+  $("customUrl").textContent = custom;
+  $("repoName").textContent = repo;
+  document.querySelectorAll(".dynamic-repo,.dynamic-target").forEach(el => el.textContent = repo);
+  document.querySelectorAll(".dynamic-free").forEach(el => el.textContent = free);
+  document.querySelectorAll(".dynamic-custom").forEach(el => el.textContent = custom);
+  document.querySelectorAll(".dynamic-root").forEach(el => el.textContent = root);
+  document.querySelectorAll(".dynamic-www").forEach(el => el.textContent = `www.${domain}`);
+  $("plannerMessage").textContent = githubId.value && domainName.value
+    ? "좋아요. 아래 단계와 DNS 표가 내 정보로 완성됐습니다."
+    : "두 칸을 입력하면 아래 DNS 표도 자동으로 바뀝니다.";
+}
+
+githubId.addEventListener("input", updatePlan);
+domainName.addEventListener("input", updatePlan);
+$("resetPlanner").addEventListener("click", () => {
+  githubId.value = ""; domainName.value = ""; updatePlan(); githubId.focus();
+});
+updatePlan();
+
+let toastTimer;
+function showToast(message = "복사했습니다.") {
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 1600);
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); showToast(); }
+  catch {
+    const area = document.createElement("textarea");
+    area.value = text; area.style.position = "fixed"; area.style.opacity = "0";
+    document.body.appendChild(area); area.select(); document.execCommand("copy"); area.remove(); showToast();
+  }
+}
+document.querySelectorAll("[data-copy-target]").forEach(button => {
+  button.addEventListener("click", () => {
+    const target = $(button.dataset.copyTarget);
+    copyText(target.innerText || target.textContent);
+  });
+});
+$("copyDns").addEventListener("click", () => {
+  const user = cleanGithub(githubId.value) || "내아이디";
+  const domain = cleanDomain(domainName.value) || "내도메인.com";
+  copyText(
+`GitHub Custom domain: www.${domain}
+CNAME | www | ${user}.github.io
+A | @ | 185.199.108.153
+A | @ | 185.199.109.153
+A | @ | 185.199.110.153
+A | @ | 185.199.111.153`);
+});
+
+const checks = [...document.querySelectorAll("[data-step]")];
+function updateProgress() {
+  const done = checks.filter(c => c.checked).length;
+  $("progressText").textContent = `${done} / ${checks.length} 완료`;
+  $("progressBar").style.width = `${done / checks.length * 100}%`;
+  const state = Object.fromEntries(checks.map(c => [c.dataset.step, c.checked]));
+  try { localStorage.setItem("githubGuideProgress", JSON.stringify(state)); } catch {}
+}
+try {
+  const saved = JSON.parse(localStorage.getItem("githubGuideProgress") || "{}");
+  checks.forEach(c => c.checked = Boolean(saved[c.dataset.step]));
+} catch {}
+checks.forEach(c => c.addEventListener("change", updateProgress));
+$("resetProgress").addEventListener("click", () => { checks.forEach(c => c.checked = false); updateProgress(); });
+updateProgress();
+
+document.querySelectorAll(".image-tabs button").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll(".image-tabs button").forEach(b => b.classList.toggle("active", b === button));
+    $("guideImage").src = button.dataset.image;
+    $("guideImage").alt = button.dataset.caption;
+    $("imageCaption").textContent = button.dataset.caption;
+  });
+});
